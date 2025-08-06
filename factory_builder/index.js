@@ -278,6 +278,7 @@ const min = (a,b) => (a < b) ? a : b;
 const strip_px = (st) => +st.substring(0, st.length - 2);
 
 var rendered_recipe_lines = [];
+var line_positions = {};
 function update_recipe_lines()
 {
     for(var line of recipe_lines)
@@ -330,6 +331,13 @@ function update_recipe_lines()
         rendered_recipe_lines[id].style.top    = top+'px';
         rendered_recipe_lines[id].style.left   = left+'px';
         rendered_recipe_lines[id].style.height = H + 'px';
+		line_positions[id] = {
+			top: top,
+			left: left,
+			height: H,
+			angle: ANG
+		};
+
     }
 }
 
@@ -449,8 +457,29 @@ function moveAll(dx, dy) {
         r.style.top = strip_px(r.style.top) + dy + "px";
         r.style.left = strip_px(r.style.left) + dx + "px";
     }
-    update_recipe_lines();
-};
+
+    for (let id in rendered_recipe_lines) {
+        let line = rendered_recipe_lines[id];
+        let cached = line_positions[id];
+        if (!cached) continue;
+
+        cached.top += dy;
+        cached.left += dx;
+
+        line.style.top = cached.top + 'px';
+        line.style.left = cached.left + 'px';
+        line.style.height = cached.height + 'px';
+
+        const angle = cached.angle;
+        line.style["-webkit-transform"] = 'rotate(' + angle + 'deg)';
+        line.style["-moz-transform"] = 'rotate(' + angle + 'deg)';
+        line.style["-ms-transform"] = 'rotate(' + angle + 'deg)';
+        line.style["-o-transform"] = 'rotate(' + angle + 'deg)';
+        line.style["transform"] = 'rotate(' + angle + 'deg)';
+    }
+}
+
+
 document.addEventListener("mousemove", (e) => {
     if(!moving) return;
     e = e || window.event;
