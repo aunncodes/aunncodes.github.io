@@ -1,0 +1,125 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -o-user-select: none;
+    user-select: none;
+}
+
+body {
+    background: #222;
+    overflow: hidden;
+}
+div {
+    display: block;
+}
+img { 
+    image-rendering: optimizeSpeed;             /* STOP SMOOTHING, GIVE ME SPEED  */
+    image-rendering: -moz-crisp-edges;          /* Firefox                        */
+    image-rendering: -o-crisp-edges;            /* Opera                          */
+    image-rendering: -webkit-optimize-contrast; /* Chrome (and eventually Safari) */
+    image-rendering: pixelated;                 /* Universal support since 2021   */
+    image-rendering: optimize-contrast;         /* CSS3 Proposed                  */
+    -ms-interpolation-mode: nearest-neighbor;   /* IE8+                           */
+}
+
+#toggle {
+    padding: 1rem;
+    border: 2px solid black;
+    border-radius: 10px;
+    background: #888;
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    color: white;
+}
+#toggle span {
+    font-family: Arial, Helvetica, sans-serif;
+    padding-left: .5rem;
+}
+
+.recipe {
+    position: absolute;
+    border: 2px solid black;
+    border-radius: 10px;
+    background: #888;
+    width: fit-content;
+    padding: var(--v10);
+    min-width: var(--v11);
+    display: flex;
+    flex-direction: row;
+}
+
+img {
+    width: var(--v1);
+    height: var(--v1);
+}
+
+.simple .block {
+    transform: translate(var(--v1), var(--v2));
+}
+.simple .input {
+    transform: translateX(var(--v3));
+}
+
+.crafter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.crafter .row1 {
+    display: flex;
+    flex-direction: column;
+}
+.crafter_2 .block {
+    transform: translateY(var(--v4));
+}
+.crafter_3 .block {
+    transform: translateY(var(--v5));
+}
+.crafter_5 .block {
+    transform: translateY(var(--v4));
+}
+.crafter_5 .row_1 {
+    display: flex;
+    flex-direction: row;
+}
+.crafter_5 .row_2 {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.crusher {
+    padding-top: var(--v12);
+}
+.crusher .top {
+    transform: translate(var(--v6), var(--v7));
+}
+.crusher .block {
+    transform: translate(var(--v7), var(--v8));
+}
+
+.spawner {
+    flex-direction: column;
+    padding-top: 0;
+    padding-bottom: 0;
+    height: var(--v13);
+}
+.spawner .loot {
+    transform: translateY(var(--v9));
+}
+.spawner .block {
+    transform: translateY(var(--v7));
+}
+
+.line {
+    position:absolute;
+    width:2px;
+    margin-top:-1px;
+    background-color:white;
+}

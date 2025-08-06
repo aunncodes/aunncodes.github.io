@@ -1,0 +1,14 @@
+<html>
+    <head>
+        <title>FactoryBuilder Recipe Visualizer</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <form id="toggle">
+            <input type="checkbox" onchange="document.querySelectorAll('.line').forEach(x => x.style.display = document.getElementById('toggle').children[0].checked ? 'none' : 'unset')"><span>Disable lines</span>
+        </form>
+        <script src="drag.js"></script>
+        <script src="data.js"></script>
+        <script src="index.js"></script>
+    </body>
+</html>
