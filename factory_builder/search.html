@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Search Recipes</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      background: #121212;
+      color: white;
+    }
+
+    input {
+      width: 100%;
+      font-size: 1.2rem;
+      padding: 0.5rem;
+      border-radius: 5px;
+      border: none;
+      margin-bottom: 1rem;
+    }
+
+    .results {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 110px;
+      padding: 0.5rem;
+      background: #1e1e1e;
+      border-radius: 8px;
+      text-decoration: none;
+      color: white;
+      transition: transform 0.2s;
+    }
+
+    .item:hover {
+      transform: scale(1.05);
+      background: #2e2e2e;
+    }
+
+    .item img {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Search Recipes</h1>
+  <input type="text" id="search" placeholder="Type an item name...">
+  <div class="results" id="results"></div>
+
+  <script src="data.js"></script>
+  <script>
+    const searchInput = document.getElementById('search');
+    const resultsDiv = document.getElementById('results');
+
+    const seenItems = new Set();
+
+    for (const type in RECIPES) {
+      for (const recipe of RECIPES[type]) {
+        if (recipe.output) seenItems.add(recipe.output);
+        if (recipe.out) seenItems.add(recipe.out);
+      }
+    }
+
+    const allItems = Array.from(seenItems).sort((a, b) => {
+      const nameA = ITEM_TRANSLATE[a] || a;
+      const nameB = ITEM_TRANSLATE[b] || b;
+      return nameA.localeCompare(nameB);
+    });
+
+    function displayResults(items) {
+      resultsDiv.innerHTML = '';
+      for (const item of items) {
+        const link = document.createElement('a');
+        link.href = `./?${item}`;
+        link.className = 'item';
+
+        const img = document.createElement('img');
+        img.src = `cdn/minecraft_${item}.png`;
+        img.alt = item;
+
+        const label = document.createElement('div');
+        label.textContent = ITEM_TRANSLATE[item] || item.replaceAll('_', ' ');
+
+        link.appendChild(img);
+        link.appendChild(label);
+        resultsDiv.appendChild(link);
+      }
+    }
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      const filtered = allItems.filter(id => {
+        const name = (ITEM_TRANSLATE[id] || id).toLowerCase();
+        return name.includes(q);
+      });
+      displayResults(filtered);
+    });
+
+    displayResults(allItems);
+  </script>
+</body>
+</html>

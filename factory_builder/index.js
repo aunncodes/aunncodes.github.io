@@ -265,7 +265,13 @@ function render_recipe(end_item)
     recipes_rendered[end_item] = div;
 }
 
-render_recipe(window.location.search.substring(1));
+const item = window.location.search.substring(1);
+if (!item) {
+    window.location.href = "./search.html";
+} else {
+    render_recipe(item);
+}
+
 
 const max = (a,b) => (a > b) ? a : b;
 const min = (a,b) => (a < b) ? a : b;
