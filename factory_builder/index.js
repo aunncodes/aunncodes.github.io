@@ -21,17 +21,17 @@ function find_recipe(end_item)
 var recipe_render = [];
 var recipes_rendered = {};
 const recipe_type_to_block = {
-    "cutter": "stonecutter",
-    "furnace": "blast_furnace",
-    "washer": "water_bucket",
-    "flashbaker": "lava_bucket",
-    "sonic_zapper": "reinforced_deepslate",
-    "crafter_2": "crafting_table",
-    "crafter_3": "crafter",
-    "crusher": "smoker",
-    "enchanter": "enchanting_table",
-    "explosive_furnace": "furnace",
-    "crafter_5": "shroomlight"
+    "cutter": "minecraft_stonecutter",
+    "furnace": "fb_furnace",
+    "washer": "fb_washer",
+    "flashbaker": "fb_flashbaker",
+    "sonic_zapper": "fb_zapper",
+    "crafter_2": "fb_crafter_2",
+    "crafter_3": "fb_crafter_3",
+    "crusher": "fb_crusher",
+    "enchanter": "fb_enchanter",
+    "explosive_furnace": "fb_explosive_furnace",
+    "crafter_5": "fb_crafter_5"
 }
 var recipe_lines = [];
 
@@ -73,7 +73,7 @@ function render_recipe(end_item)
             div.classList = "recipe simple " + recipe.type;
             var img = document.createElement("img");
             img.classList = "block";
-            img.src = "cdn/minecraft_" + recipe_type_to_block[recipe.type] + ".png";
+            img.src = "cdn/" + recipe_type_to_block[recipe.type] + ".png";
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "input";
@@ -110,7 +110,7 @@ function render_recipe(end_item)
             mini_div.appendChild(img);
             img = document.createElement("img");
             img.classList = "block";
-            img.src = "cdn/minecraft_" + recipe_type_to_block[recipe.type] + ".png";
+            img.src = "cdn/" + recipe_type_to_block[recipe.type] + ".png";
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "output";
@@ -150,7 +150,7 @@ function render_recipe(end_item)
             mini_div.appendChild(img);
             img = document.createElement("img");
             img.classList = "block";
-            img.src = "cdn/minecraft_" + recipe_type_to_block[recipe.type] + ".png";
+            img.src = "cdn/" + recipe_type_to_block[recipe.type] + ".png";
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "output";
@@ -184,7 +184,7 @@ function render_recipe(end_item)
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "block";
-            img.src = "cdn/minecraft_" + recipe_type_to_block[recipe.type] + ".png";
+            img.src = "cdn/" + recipe_type_to_block[recipe.type] + ".png";
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "output";
@@ -237,7 +237,7 @@ function render_recipe(end_item)
             mini_div.appendChild(div1);
             img = document.createElement("img");
             img.classList = "block";
-            img.src = "cdn/minecraft_" + recipe_type_to_block[recipe.type] + ".png";
+            img.src = "cdn/" + recipe_type_to_block[recipe.type] + ".png";
             div.appendChild(img);
             img = document.createElement("img");
             img.classList = "output";
