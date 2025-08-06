@@ -441,6 +441,9 @@ document.addEventListener("mousedown", (e) => {
     startX = e.screenX;
     startY = e.screenY;
 }, {passive: false});
+document.addEventListener("mouseup", (e) => {
+	moving = false;
+});
 function moveAll(dx, dy) {
     for (var r of document.getElementsByClassName("recipe")) {
         r.style.top = strip_px(r.style.top) + dy + "px";
