@@ -441,20 +441,13 @@ document.addEventListener("mousedown", (e) => {
     startX = e.screenX;
     startY = e.screenY;
 }, {passive: false});
-document.addEventListener("mouseup", (e) => {
-    if(moving)
-        update_recipe_lines();
-    moving = false;
-});
-function moveAll(dx, dy)
-{
-    console.log(dx, dy);
-    for(var r of document.getElementsByClassName("recipe"))
-    {
+function moveAll(dx, dy) {
+    for (var r of document.getElementsByClassName("recipe")) {
         r.style.top = strip_px(r.style.top) + dy + "px";
         r.style.left = strip_px(r.style.left) + dx + "px";
     }
-}
+    update_recipe_lines();
+};
 document.addEventListener("mousemove", (e) => {
     if(!moving) return;
     e = e || window.event;
