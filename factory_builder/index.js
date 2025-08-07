@@ -268,6 +268,11 @@ function render_recipe(end_item)
 const item = window.location.search.substring(1);
 if (!item) {
     window.location.href = "./search.html";
+} else if (!(item in ITEMS)) {
+    document.getElementById("toggle").style.opacity = 0;
+    const element = document.createElement("div"); element.id = "invalid-item";
+    element.appendChild(document.createTextNode("Invalid Item."));
+    document.body.appendChild(element);
 } else {
     render_recipe(item);
 }
