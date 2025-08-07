@@ -1,3 +1,5 @@
+var dragging = false;
+
 function dragElement(elmnt) {
   var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
   if (document.getElementById(elmnt.id + "header")) {
@@ -18,6 +20,8 @@ function dragElement(elmnt) {
     document.onmouseup = closeDragElement;
     // call a function whenever the cursor moves:
     document.onmousemove = elementDrag;
+
+    dragging = true;
   }
 
   function elementDrag(e) {
@@ -38,5 +42,7 @@ function dragElement(elmnt) {
     document.onmouseup = null;
     document.onmousemove = null;
     update_recipe_lines();
+
+    dragging = false;
   }
 }

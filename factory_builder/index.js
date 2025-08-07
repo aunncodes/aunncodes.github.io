@@ -298,7 +298,7 @@ function update_recipe_lines()
             // create line
             var line = document.createElement("div");
             line.classList = "line";
-            document.body.appendChild(line);
+            document.body.insertBefore(line, document.getElementById("toggle"));
             rendered_recipe_lines[id] = line;
         }
 
@@ -406,7 +406,7 @@ function loaded() {
     --v7: -2rem;
     --v8: -6.5rem;
     --v9: -1.5rem;
-    */
+*/
 
 const default_size = [0,4,-3.5,-4,-5,-7,2,-2,-6.5,-1.5,1,5,4.5,7.5];
 var old_zoom = 1;
@@ -447,7 +447,9 @@ var moving = false;
 var startX, startY;
 document.addEventListener("mousedown", (e) => {
     e = e || window.event;
-    if(e.button != 2) return;
+    console.log(e.button);
+    if(e.button != 2 && e.button != 0) return;
+    if (e.button == 0 && dragging) return;
     e.preventDefault();
     e.stopPropagation();
     moving = true;
@@ -490,7 +492,8 @@ document.addEventListener("mousemove", (e) => {
     e = e || window.event;
     var dx = e.screenX - startX;
     var dy = e.screenY - startY;
-    moveAll(dx / window.devicePixelRatio, dy / window.devicePixelRatio);
+    //moveAll(dx / window.devicePixelRatio, dy / window.devicePixelRatio);
+    moveAll(dx, dy);
     startX = e.screenX;
     startY = e.screenY;
 })
