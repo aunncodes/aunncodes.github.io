@@ -302,37 +302,37 @@ function update_recipe_lines()
             rendered_recipe_lines[id] = line;
         }
 
-        var fT = strip_px(from.style.top) + from_box.height/2;
-        var tT = strip_px(to.style.top) + to_box.height/2;
-        var fL = strip_px(from.style.left) + from_box.width;
-        var tL = strip_px(to.style.left);
+        var fromTop = strip_px(from.style.top) + from_box.height/2;
+        var toTop = strip_px(to.style.top) + to_box.height/2;
+        var fromLeft = strip_px(from.style.left) + from_box.width;
+        var toLeft = strip_px(to.style.left);
         
-        var CA   = Math.abs(tT - fT);
-        var CO   = Math.abs(tL - fL);
+        var CA   = Math.abs(toTop - fromTop);
+        var CO   = toLeft - fromLeft;
         var H    = Math.sqrt(CA*CA + CO*CO);
-        var ANG  = 180 / Math.PI * Math.acos( CA/H );
+        var ANG  = Math.acos( CA/H );
 
-        if(tT > fT){
-            var top  = (tT-fT)/2 + fT;
+        if(toTop > fromTop){
+            var top  = (toTop-fromTop)/2 + fromTop;
         }else{
-            var top  = (fT-tT)/2 + tT;
+            var top  = (fromTop-toTop)/2 + toTop;
         }
-        if(tL > fL){
-            var left = (tL-fL)/2 + fL;
+        if(toLeft > fromLeft){
+            var left = (toLeft-fromLeft)/2 + fromLeft;
         }else{
-            var left = (fL-tL)/2 + tL;
+            var left = (fromLeft-toLeft)/2 + toLeft;
         }
 
-        if(( fT < tT && fL < tL) || ( tT < fT && tL < fL) || (fT > tT && fL > tL) || (tT > fT && tL > fL)){
+        if(( fromTop < toTop && fromLeft < toLeft) || ( toTop < fromTop && toLeft < fromLeft) || (fromTop > toTop && fromLeft > toLeft) || (toTop > fromTop && toLeft > fromLeft)){
             ANG *= -1;
         }
         top-= H/2;
 
-        rendered_recipe_lines[id].style["-webkit-transform"] = 'rotate('+ ANG +'deg)';
-        rendered_recipe_lines[id].style["-moz-transform"] = 'rotate('+ ANG +'deg)';
-        rendered_recipe_lines[id].style["-ms-transform"] = 'rotate('+ ANG +'deg)';
-        rendered_recipe_lines[id].style["-o-transform"] = 'rotate('+ ANG +'deg)';
-        rendered_recipe_lines[id].style["-transform"] = 'rotate('+ ANG +'deg)';
+        rendered_recipe_lines[id].style["-webkit-transform"] = 'rotate('+ ANG +'rad)';
+        rendered_recipe_lines[id].style["-moz-transform"] = 'rotate('+ ANG +'rad)';
+        rendered_recipe_lines[id].style["-ms-transform"] = 'rotate('+ ANG +'ra  d)';
+        rendered_recipe_lines[id].style["-o-transform"] = 'rotate('+ ANG +'rad)';
+        rendered_recipe_lines[id].style["-transform"] = 'rotate('+ ANG +'rad)';
         rendered_recipe_lines[id].style.top    = top+'px';
         rendered_recipe_lines[id].style.left   = left+'px';
         rendered_recipe_lines[id].style.height = H + 'px';
@@ -417,37 +417,30 @@ function updateZoom(zoom)
         root.style.setProperty('--v' + i, default_size[i] * zoom + "rem");
     // update recipes offsets
     for(var r of document.getElementsByClassName("recipe")) {
-        var oldTop = strip_px(r.style.top);
-        var oldLeft = strip_px(r.style.left);
-        r.style.top = oldTop * zoom / old_zoom + "px";
-        r.style.left = oldLeft * zoom / old_zoom + "px";
+        r.style.top = strip_px(r.style.top) * zoom / old_zoom + "px";
+        r.style.left = strip_px(r.style.left) * zoom / old_zoom + "px";
     }
     old_zoom = zoom;
-    update_recipe_lines();
 }
 
 document.addEventListener("wheel", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    console.log(event);
-    if(event.deltaY > 0) {
+    if (event.deltaY > 0) {
         updateZoom(old_zoom / 1.1);
         moveAll(event.clientX / 11, event.clientY / 11);
-        update_recipe_lines();
-    }
-    else if(event.deltaY < 0) {
+    } else if (event.deltaY < 0) {
         updateZoom(old_zoom * 1.1);
-        // event.screenX - event.screenX * 1.1
-        moveAll(-event.clientX / 10, -event.clientY / 10);
-        update_recipe_lines();
+        moveAll(-event.clientX * 0.1, -event.clientY * 0.1);
     }
+
+    update_recipe_lines();
 }, { passive: false });
 
 var moving = false;
 var startX, startY;
 document.addEventListener("mousedown", (e) => {
     e = e || window.event;
-    console.log(e.button);
     if(e.button != 2 && e.button != 0) return;
     if (e.button == 0 && dragging) return;
     e.preventDefault();
@@ -475,14 +468,6 @@ function moveAll(dx, dy) {
 
         line.style.top = cached.top + 'px';
         line.style.left = cached.left + 'px';
-        line.style.height = cached.height + 'px';
-
-        const angle = cached.angle;
-        line.style["-webkit-transform"] = 'rotate(' + angle + 'deg)';
-        line.style["-moz-transform"] = 'rotate(' + angle + 'deg)';
-        line.style["-ms-transform"] = 'rotate(' + angle + 'deg)';
-        line.style["-o-transform"] = 'rotate(' + angle + 'deg)';
-        line.style["transform"] = 'rotate(' + angle + 'deg)';
     }
 }
 
