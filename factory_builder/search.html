@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" href="/factory_builder/cdn/fb_furnace.png" type="image/x-icon"/>
   <title>Search Recipes</title>
   <style>
     body {
@@ -79,9 +80,16 @@
 
     function displayResults(items) {
       resultsDiv.innerHTML = '';
+
+      if (items.length == 0) {
+        const node = document.createElement('asdf');
+        node.textContent = "No results found."
+        resultsDiv.appendChild(node);
+      }
+
       for (const item of items) {
         const link = document.createElement('a');
-        link.href = `./?${item}`;
+        link.href = `./index.html?${item}`;
         link.className = 'item';
 
         const img = document.createElement('img');
