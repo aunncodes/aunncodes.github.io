@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBT Resource Pack Viewer</title>
+
+  <style>
+    :root {
+      --bg: #101418;
+      --panel: #171d24;
+      --panel-2: #202833;
+      --text: #f3f6f8;
+      --muted: #9da9b6;
+      --border: #2e3a47;
+      --accent: #79c7ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 315px 1fr;
+      height: 100vh;
+    }
+
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 2;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+
+    .stat:last-child {
+      border-bottom: 0;
+    }
+
+    .stat span:first-child {
+      color: var(--muted);
+    }
+
+    .stat span:last-child {
+      text-align: right;
+      word-break: break-word;
+    }
+
+    code {
+      color: var(--accent);
+    }
+
+    #viewer {
+      position: relative;
+      min-width: 0;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #hint {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      max-width: min(650px, calc(100vw - 360px));
+      background: rgba(16, 20, 24, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      pointer-events: none;
+    }
+
+    #status {
+      color: var(--accent);
+    }
+
+    @media (max-width: 800px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      #hint {
+        max-width: calc(100vw - 32px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <aside>
+      <div>
+        <h1>NBT Viewer</h1>
+      </div>
+
+      <div>
+        <label for="fileInput">NBT file</label>
+        <input id="fileInput" type="file" accept=".nbt" />
+      </div>
+
+      <div class="card">
+        <div class="stat">
+          <span>Status</span>
+          <span id="status">Waiting</span>
+        </div>
+        <div class="stat">
+          <span>Size</span>
+          <span id="sizeText">-</span>
+        </div>
+        <div class="stat">
+          <span>Blocks</span>
+          <span id="blockCountText">-</span>
+        </div>
+        <div class="stat">
+          <span>Visible</span>
+          <span id="visibleCountText">-</span>
+        </div>
+        <div class="stat">
+          <span>Meshes</span>
+          <span id="meshCountText">-</span>
+        </div>
+        <div class="stat">
+          <span>Selected</span>
+          <span id="selectedText">None</span>
+        </div>
+        <div class="stat">
+          <span>Block type</span>
+          <span id="blockTypeText">-</span>
+        </div>
+      </div>
+    </aside>
+
+    <main id="viewer">
+      <div id="hint">No model loaded yet.</div>
+    </main>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { read } from "https://cdn.jsdelivr.net/npm/nbtify@2.2.0/+esm";
+
+    const RESOURCE_ROOT = "./data/assets/";
+    const DEFAULT_NAMESPACE = "minecraft";
+
+    const viewer = document.getElementById("viewer");
+    const fileInput = document.getElementById("fileInput");
+    const hint = document.getElementById("hint");
+
+    const statusText = document.getElementById("status");
+    const sizeText = document.getElementById("sizeText");
+    const blockCountText = document.getElementById("blockCountText");
+    const visibleCountText = document.getElementById("visibleCountText");
+    const meshCountText = document.getElementById("meshCountText");
+    const selectedText = document.getElementById("selectedText");
+    const blockTypeText = document.getElementById("blockTypeText");
+
+    const jsonCache = new Map();
+    const modelCache = new Map();
+    const textureCache = new Map();
+    const materialCache = new Map();
+    const blockGeometryCache = new Map();
+
+    let modelGroup = new THREE.Group();
+    let pickables = [];
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101418);
+
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 10000);
+    camera.position.set(32, 28, 40);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      alpha: false
+    });
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    viewer.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.screenSpacePanning = true;
+
+    renderer.domElement.addEventListener("contextmenu", event => {
+      event.preventDefault();
+    });
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.86);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.05);
+    directionalLight.position.set(24, 48, 32);
+    scene.add(directionalLight);
+
+    scene.add(modelGroup);
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    let groundPlane = null;
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+
+      try {
+        resetScene();
+
+        statusText.textContent = "Parsing";
+        hint.textContent = "Parsing NBT...";
+
+        const buffer = await file.arrayBuffer();
+        const parsed = await read(buffer);
+        const root = unwrapNBT(parsed);
+        const structure = extractSupportedStructure(root);
+
+        statusText.textContent = "Resolving resources";
+        hint.textContent = "Loading blockstates, models, and textures...";
+
+        await renderStructure(structure);
+
+        statusText.textContent = "Loaded";
+        hint.textContent = `${file.name} loaded. Hover a block part to inspect it.`;
+      } catch (error) {
+        console.error(error);
+        statusText.textContent = "Error";
+        hint.textContent = "Failed to load. Check the console for the exact error.";
+        alert(error.message || String(error));
+      }
+    });
+
+    function aliasMissingTextureRef(textureRef) {
+      textureRef = unwrapResourceValue(textureRef);
+
+      if (typeof textureRef !== "string") {
+        return "minecraft:block/missing";
+      }
+
+      const aliases = {
+        "minecraft:block/barrier": "minecraft:item/barrier",
+        "minecraft:barrier": "minecraft:item/barrier",
+        "block/barrier": "minecraft:item/barrier",
+        "barrier": "minecraft:item/barrier",
+
+        "minecraft:block/structure_void": "minecraft:item/structure_void",
+        "minecraft:structure_void": "minecraft:item/structure_void",
+        "block/structure_void": "minecraft:item/structure_void",
+        "structure_void": "minecraft:item/structure_void"
+      };
+
+      return aliases[textureRef] || textureRef;
+    }
+
+    function resetScene() {
+      for (const child of modelGroup.children) {
+        if (child.geometry) child.geometry.dispose();
+      }
+
+      modelGroup.clear();
+      pickables = [];
+
+      if (groundPlane) {
+        scene.remove(groundPlane);
+        groundPlane.geometry.dispose();
+        groundPlane.material.dispose();
+        groundPlane = null;
+      }
+
+      sizeText.textContent = "-";
+      blockCountText.textContent = "-";
+      visibleCountText.textContent = "-";
+      meshCountText.textContent = "-";
+      selectedText.textContent = "None";
+      blockTypeText.textContent = "-";
+    }
+
+    function unwrapNBT(value) {
+      if (value === null || value === undefined) return value;
+
+      if (typeof value === "number") return value;
+      if (typeof value === "string") return value;
+      if (typeof value === "boolean") return value;
+      if (typeof value === "bigint") return Number(value);
+
+      if (ArrayBuffer.isView(value)) {
+        return Array.from(value, unwrapNBT);
+      }
+
+      if (Array.isArray(value)) {
+        return value.map(unwrapNBT);
+      }
+
+      if (typeof value !== "object") return value;
+
+      if (typeof value.valueOf === "function") {
+        const primitive = value.valueOf();
+
+        if (primitive !== value && typeof primitive !== "object") {
+          return primitive;
+        }
+      }
+
+      const keys = Object.keys(value);
+
+      if ("value" in value && keys.length <= 4) return unwrapNBT(value.value);
+      if ("data" in value && keys.length <= 4) return unwrapNBT(value.data);
+      if ("root" in value && keys.length <= 4) return unwrapNBT(value.root);
+
+      const out = {};
+
+      for (const [key, child] of Object.entries(value)) {
+        out[key] = unwrapNBT(child);
+      }
+
+      return out;
+    }
+
+    function toNumber(value) {
+      const unwrapped = unwrapNBT(value);
+
+      if (typeof unwrapped === "number") return unwrapped;
+      if (typeof unwrapped === "bigint") return Number(unwrapped);
+
+      return Number(unwrapped);
+    }
+
+    function toNumberArray(value) {
+      const unwrapped = unwrapNBT(value);
+
+      if (ArrayBuffer.isView(unwrapped)) {
+        return Array.from(unwrapped, Number);
+      }
+
+      if (Array.isArray(unwrapped)) {
+        return unwrapped.map(toNumber);
+      }
+
+      return [];
+    }
+
+    function extractSupportedStructure(root) {
+      const data = root?.data;
+
+      if (!data || typeof data !== "object") {
+        throw new Error("Unsupported NBT shape. Expected root.data.");
+      }
+
+      const size = toNumberArray(data.size);
+      const palette = data.palette;
+      const blocks = data.blocks;
+
+      if (!Array.isArray(size) || size.length !== 3 || size.some(Number.isNaN)) {
+        throw new Error("Unsupported NBT shape. Expected root.data.size as [x, y, z].");
+      }
+
+      if (!Array.isArray(palette)) {
+        throw new Error("Unsupported NBT shape. Expected root.data.palette.");
+      }
+
+      if (!Array.isArray(blocks)) {
+        throw new Error("Unsupported NBT shape. Expected root.data.blocks.");
+      }
+
+      return {
+        dataVersion: toNumber(data.DataVersion),
+        size,
+        palette,
+        blocks
+      };
+    }
+
+    async function renderStructure(structure) {
+      const [sx, sy, sz] = structure.size;
+
+      createGroundPlane(sx, sz);
+
+      const horizontalCenter = new THREE.Vector3(sx / 2, 0, sz / 2);
+      const buckets = new Map();
+
+      let visibleBlocks = 0;
+      let skippedBlocks = 0;
+
+      for (const rawBlock of structure.blocks) {
+        const stateIndex = toNumber(rawBlock.state);
+        const paletteEntry = structure.palette[stateIndex];
+
+        if (!paletteEntry) {
+          skippedBlocks++;
+          continue;
+        }
+
+        const blockName = paletteEntry.Name || paletteEntry.name;
+        const properties = paletteEntry.Properties || paletteEntry.properties || {};
+        const pos = toNumberArray(rawBlock.pos);
+
+        if (!blockName || pos.length !== 3) {
+          skippedBlocks++;
+          continue;
+        }
+
+        if (blockName === "minecraft:air") {
+          continue;
+        }
+
+        const block = {
+          name: blockName,
+          properties,
+          pos,
+          stateIndex
+        };
+
+        const geometryInfo = await getBlockGeometryInfo(block);
+
+        if (!geometryInfo || geometryInfo.positions.length === 0) {
+          skippedBlocks++;
+          continue;
+        }
+
+        visibleBlocks++;
+
+        const key = geometryInfo.cacheKey;
+
+        if (!buckets.has(key)) {
+          buckets.set(key, {
+            geometryInfo,
+            instances: []
+          });
+        }
+
+        buckets.get(key).instances.push(block);
+      }
+
+      let meshCount = 0;
+
+      for (const bucket of buckets.values()) {
+        const { geometryInfo, instances } = bucket;
+
+        const geometry = makeBufferGeometry(geometryInfo);
+        const materials = await getMaterialsForTextures(geometryInfo.textureRefs);
+
+        const mesh = new THREE.InstancedMesh(geometry, materials, instances.length);
+        mesh.userData.blocks = instances;
+
+        const matrix = new THREE.Matrix4();
+
+        instances.forEach((block, index) => {
+          const [x, y, z] = block.pos;
+
+          matrix.makeTranslation(
+            x - horizontalCenter.x,
+            y,
+            z - horizontalCenter.z
+          );
+
+          mesh.setMatrixAt(index, matrix);
+        });
+
+        mesh.instanceMatrix.needsUpdate = true;
+
+        modelGroup.add(mesh);
+        pickables.push(mesh);
+
+        meshCount++;
+      }
+
+      sizeText.textContent = `${sx} x ${sy} x ${sz}`;
+      blockCountText.textContent = String(structure.blocks.length);
+      visibleCountText.textContent = String(visibleBlocks);
+      meshCountText.textContent = String(meshCount);
+
+      const maxDimension = Math.max(sx, sy, sz);
+
+      controls.target.set(0, Math.max(1, sy / 2), 0);
+      camera.position.set(
+        Math.max(16, sx * 1.35),
+        Math.max(12, sy * 1.3),
+        Math.max(16, sz * 1.35)
+      );
+      camera.near = 0.1;
+      camera.far = Math.max(1000, maxDimension * 50);
+      camera.updateProjectionMatrix();
+      controls.update();
+
+      console.log({
+        totalBlocks: structure.blocks.length,
+        visibleBlocks,
+        skippedBlocks,
+        meshBuckets: meshCount
+      });
+    }
+
+    function createGroundPlane(sizeX, sizeZ) {
+      const geometry = new THREE.PlaneGeometry(sizeX, sizeZ, sizeX, sizeZ);
+      geometry.rotateX(-Math.PI / 2);
+      geometry.translate(0, 0, 0);
+
+      const material = new THREE.MeshBasicMaterial({
+        color: 0x222b34,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.45
+      });
+
+      groundPlane = new THREE.Mesh(geometry, material);
+      scene.add(groundPlane);
+    }
+
+    function makeSpecialBillboardGeometryInfo(cacheKey, textureRef, size) {
+      if (blockGeometryCache.has(cacheKey)) {
+        return blockGeometryCache.get(cacheKey);
+      }
+
+      const builder = new GeometryBuilder();
+
+      const min = 0.5 - size / 2;
+      const max = 0.5 + size / 2;
+
+      addPlaneFace(
+        builder,
+        [
+          new THREE.Vector3(min, min, 0.5),
+          new THREE.Vector3(max, min, 0.5),
+          new THREE.Vector3(max, max, 0.5),
+          new THREE.Vector3(min, max, 0.5)
+        ],
+        textureRef
+      );
+
+      addPlaneFace(
+        builder,
+        [
+          new THREE.Vector3(0.5, min, min),
+          new THREE.Vector3(0.5, min, max),
+          new THREE.Vector3(0.5, max, max),
+          new THREE.Vector3(0.5, max, min)
+        ],
+        textureRef
+      );
+
+      const geometryInfo = builder.finish(cacheKey);
+      blockGeometryCache.set(cacheKey, geometryInfo);
+
+      return geometryInfo;
+    }
+
+    function addPlaneFace(builder, vertices, textureRef) {
+      builder.addFace(
+        vertices,
+        [
+          new THREE.Vector2(0, 0),
+          new THREE.Vector2(1, 0),
+          new THREE.Vector2(1, 1),
+          new THREE.Vector2(0, 1)
+        ],
+        textureRef
+      );
+    }
+
+    function makeSkullGeometryInfo(cacheKey, textureRef) {
+      if (blockGeometryCache.has(cacheKey)) {
+        return blockGeometryCache.get(cacheKey);
+      }
+
+      const builder = new GeometryBuilder();
+
+      const minX = 0.25;
+      const minY = 0.00;
+      const minZ = 0.25;
+      const maxX = 0.75;
+      const maxY = 0.50;
+      const maxZ = 0.75;
+
+      addBoxWithTexture(
+        builder,
+        [minX, minY, minZ],
+        [maxX, maxY, maxZ],
+        textureRef
+      );
+
+      const geometryInfo = builder.finish(cacheKey);
+      blockGeometryCache.set(cacheKey, geometryInfo);
+
+      return geometryInfo;
+    }
+
+    function addBoxWithTexture(builder, from, to, textureRef) {
+      const model = {
+        id: "special:box",
+        textures: {
+          all: textureRef
+        }
+      };
+
+      const element = {
+        from: [
+          from[0] * 16,
+          from[1] * 16,
+          from[2] * 16
+        ],
+        to: [
+          to[0] * 16,
+          to[1] * 16,
+          to[2] * 16
+        ],
+        faces: {
+          up: { texture: "#all" },
+          down: { texture: "#all" },
+          north: { texture: "#all" },
+          south: { texture: "#all" },
+          west: { texture: "#all" },
+          east: { texture: "#all" }
+        }
+      };
+
+      appendElement(builder, model, element, {
+        blockRotationX: 0,
+        blockRotationY: 0,
+        uvlock: false
+      });
+    }
+
+    function makeSpecialBlockGeometryInfo(block) {
+      const id = block.name;
+
+      if (id === "minecraft:barrier") {
+        return makeSpecialBillboardGeometryInfo(
+          "special:minecraft:barrier",
+          "minecraft:item/barrier",
+          0.72
+        );
+      }
+
+      if (id === "minecraft:structure_void") {
+        return makeSpecialBillboardGeometryInfo(
+          "special:minecraft:structure_void",
+          "minecraft:item/structure_void",
+          0.72
+        );
+      }
+
+      if (
+        id === "minecraft:skeleton_skull" ||
+        id === "minecraft:skeleton_wall_skull"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:skeleton_skull",
+          "minecraft:entity/skeleton/skeleton"
+        );
+      }
+
+      if (
+        id === "minecraft:wither_skeleton_skull" ||
+        id === "minecraft:wither_skeleton_wall_skull"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:wither_skeleton_skull",
+          "minecraft:entity/skeleton/wither_skeleton"
+        );
+      }
+
+      if (
+        id === "minecraft:zombie_head" ||
+        id === "minecraft:zombie_wall_head"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:zombie_head",
+          "minecraft:entity/zombie/zombie"
+        );
+      }
+
+      if (
+        id === "minecraft:creeper_head" ||
+        id === "minecraft:creeper_wall_head"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:creeper_head",
+          "minecraft:entity/creeper/creeper"
+        );
+      }
+
+      if (
+        id === "minecraft:dragon_head" ||
+        id === "minecraft:dragon_wall_head"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:dragon_head",
+          "minecraft:entity/enderdragon/dragon"
+        );
+      }
+
+      if (
+        id === "minecraft:piglin_head" ||
+        id === "minecraft:piglin_wall_head"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:piglin_head",
+          "minecraft:entity/piglin/piglin"
+        );
+      }
+
+      if (
+        id === "minecraft:player_head" ||
+        id === "minecraft:player_wall_head"
+      ) {
+        return makeSkullGeometryInfo(
+          "special:minecraft:player_head",
+          "minecraft:entity/player/wide/steve"
+        );
+      }
+
+      return null;
+    }
+
+    async function getBlockGeometryInfo(block) {
+      const special = makeSpecialBlockGeometryInfo(block);
+
+      if (special) {
+        return special;
+      }
+
+      const normalizedBlock = normalizeResourceId(block.name);
+      const blockstate = await loadBlockstate(normalizedBlock);
+
+      if (!blockstate) {
+        return makeMissingCubeGeometryInfo(block.name);
+      }
+
+      const modelEntries = resolveBlockstateModels(blockstate, block.properties);
+
+      if (modelEntries.length === 0) {
+        return makeMissingCubeGeometryInfo(block.name);
+      }
+
+      const cacheKey = JSON.stringify({
+        name: block.name,
+        properties: block.properties,
+        models: modelEntries
+      });
+
+      if (blockGeometryCache.has(cacheKey)) {
+        return blockGeometryCache.get(cacheKey);
+      }
+
+      const builder = new GeometryBuilder();
+
+      for (const entry of modelEntries) {
+        const model = await resolveModel(normalizeModelReference(entry.model));
+
+        if (!model) continue;
+
+        appendResolvedModel(builder, model, {
+          blockRotationX: Number(entry.x || 0),
+          blockRotationY: Number(entry.y || 0),
+          uvlock: Boolean(entry.uvlock)
+        });
+      }
+
+      const geometryInfo = builder.finish(cacheKey);
+
+      if (geometryInfo.positions.length === 0) {
+        const fallback = makeMissingCubeGeometryInfo(block.name);
+        blockGeometryCache.set(cacheKey, fallback);
+        return fallback;
+      }
+
+      blockGeometryCache.set(cacheKey, geometryInfo);
+      return geometryInfo;
+    }
+
+    function resolveBlockstateModels(blockstate, properties) {
+      if (blockstate.multipart) {
+        const entries = [];
+
+        for (const part of blockstate.multipart) {
+          if (!part.apply) continue;
+
+          if (!part.when || blockstateConditionMatches(part.when, properties)) {
+            const applyEntries = Array.isArray(part.apply) ? part.apply : [part.apply];
+
+            for (const entry of applyEntries) {
+              entries.push(pickWeightedModel(entry));
+            }
+          }
+        }
+
+        return entries.filter(Boolean);
+      }
+
+      if (blockstate.variants) {
+        let fallback = null;
+
+        for (const [variantKey, variantValue] of Object.entries(blockstate.variants)) {
+          if (fallback === null) fallback = variantValue;
+
+          if (variantKeyMatches(variantKey, properties)) {
+            const picked = pickWeightedModel(variantValue);
+            return picked ? [picked] : [];
+          }
+        }
+
+        const emptyVariant = blockstate.variants[""];
+
+        if (emptyVariant) {
+          const picked = pickWeightedModel(emptyVariant);
+          return picked ? [picked] : [];
+        }
+
+        const picked = pickWeightedModel(fallback);
+        return picked ? [picked] : [];
+      }
+
+      return [];
+    }
+
+    function variantKeyMatches(variantKey, properties) {
+      if (variantKey === "") return true;
+
+      const terms = variantKey.split(",");
+
+      for (const term of terms) {
+        const [key, expectedRaw] = term.split("=");
+
+        if (!key || expectedRaw === undefined) {
+          return false;
+        }
+
+        const actual = String(properties[key]);
+        const expectedOptions = expectedRaw.split("|");
+
+        if (!expectedOptions.includes(actual)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function blockstateConditionMatches(condition, properties) {
+      if (Array.isArray(condition.OR)) {
+        return condition.OR.some(child => blockstateConditionMatches(child, properties));
+      }
+
+      if (Array.isArray(condition.AND)) {
+        return condition.AND.every(child => blockstateConditionMatches(child, properties));
+      }
+
+      for (const [key, expectedRaw] of Object.entries(condition)) {
+        if (key === "OR" || key === "AND") continue;
+
+        const actual = String(properties[key]);
+        const expectedOptions = String(expectedRaw).split("|");
+
+        if (!expectedOptions.includes(actual)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function pickWeightedModel(value) {
+      if (Array.isArray(value)) {
+        return value[0] || null;
+      }
+
+      return value || null;
+    }
+
+    async function loadBlockstate(blockId) {
+      const path = resourcePath(blockId.namespace, "blockstates", blockId.path, "json");
+      return await loadJson(path);
+    }
+
+    async function resolveModel(modelId) {
+      const key = `${modelId.namespace}:${modelId.path}`;
+
+      if (modelCache.has(key)) {
+        return modelCache.get(key);
+      }
+
+      const promise = resolveModelInner(modelId, new Set());
+      modelCache.set(key, promise);
+
+      return promise;
+    }
+
+    async function resolveModelInner(modelId, seen) {
+      const key = `${modelId.namespace}:${modelId.path}`;
+
+      if (seen.has(key)) {
+        console.warn(`Circular model parent chain: ${key}`);
+        return null;
+      }
+
+      seen.add(key);
+
+      const path = resourcePath(modelId.namespace, "models", modelId.path, "json");
+      const raw = await loadJson(path);
+
+      if (!raw) {
+        console.warn(`Missing model: ${key}`);
+        return null;
+      }
+
+      let parent = null;
+
+      if (raw.parent) {
+        parent = await resolveModelInner(normalizeModelReference(raw.parent), seen);
+      }
+
+      const textures = {
+        ...(parent?.textures || {}),
+        ...(raw.textures || {})
+      };
+
+      const elements = raw.elements || parent?.elements || [];
+
+      return {
+        id: key,
+        parent: raw.parent || parent?.parent || null,
+        ambientocclusion: raw.ambientocclusion ?? parent?.ambientocclusion ?? true,
+        textures,
+        elements
+      };
+    }
+
+    async function loadJson(path) {
+      if (jsonCache.has(path)) {
+        return jsonCache.get(path);
+      }
+
+      const promise = fetch(path)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          return response.json();
+        })
+        .catch(error => {
+          console.warn(`Could not load JSON: ${path}`, error);
+          return null;
+        });
+
+      jsonCache.set(path, promise);
+      return promise;
+    }
+
+    function appendResolvedModel(builder, model, transform) {
+      for (const element of model.elements || []) {
+        appendElement(builder, model, element, transform);
+      }
+    }
+
+    function appendElement(builder, model, element, transform) {
+      const from = vec3Div16(element.from || [0, 0, 0]);
+      const to = vec3Div16(element.to || [16, 16, 16]);
+
+      const faces = element.faces || {};
+
+      for (const [faceName, face] of Object.entries(faces)) {
+        const faceVertices = makeFaceVertices(faceName, from, to);
+
+        if (!faceVertices) continue;
+
+        const transformed = faceVertices.map(vertex => {
+          let v = vertex.clone();
+
+          if (element.rotation) {
+            v = applyElementRotation(v, element.rotation);
+          }
+
+          v = applyBlockstateRotation(v, transform.blockRotationX, transform.blockRotationY);
+
+          return v;
+        });
+
+        const textureRef = resolveTextureReference(face.texture, model.textures, model.id);
+        const uv = getFaceUv(faceName, face, from, to);
+        const rotatedUv = rotateUvCorners(uv, Number(face.rotation || 0));
+
+        builder.addFace(transformed, rotatedUv, textureRef);
+      }
+    }
+
+    function makeFaceVertices(faceName, from, to) {
+      const x1 = from.x;
+      const y1 = from.y;
+      const z1 = from.z;
+      const x2 = to.x;
+      const y2 = to.y;
+      const z2 = to.z;
+
+      const p = (x, y, z) => new THREE.Vector3(x, y, z);
+
+      if (faceName === "up") {
+        return [p(x1, y2, z1), p(x1, y2, z2), p(x2, y2, z2), p(x2, y2, z1)];
+      }
+
+      if (faceName === "down") {
+        return [p(x1, y1, z2), p(x1, y1, z1), p(x2, y1, z1), p(x2, y1, z2)];
+      }
+
+      if (faceName === "north") {
+        return [p(x2, y1, z1), p(x1, y1, z1), p(x1, y2, z1), p(x2, y2, z1)];
+      }
+
+      if (faceName === "south") {
+        return [p(x1, y1, z2), p(x2, y1, z2), p(x2, y2, z2), p(x1, y2, z2)];
+      }
+
+      if (faceName === "west") {
+        return [p(x1, y1, z1), p(x1, y1, z2), p(x1, y2, z2), p(x1, y2, z1)];
+      }
+
+      if (faceName === "east") {
+        return [p(x2, y1, z2), p(x2, y1, z1), p(x2, y2, z1), p(x2, y2, z2)];
+      }
+
+      return null;
+    }
+
+    function getFaceUv(faceName, face, from, to) {
+      if (face.uv && face.uv.length === 4) {
+        return uvArrayToCorners(face.uv);
+      }
+
+      let uv;
+
+      if (faceName === "up" || faceName === "down") {
+        uv = [from.x * 16, from.z * 16, to.x * 16, to.z * 16];
+      } else if (faceName === "north" || faceName === "south") {
+        uv = [from.x * 16, 16 - to.y * 16, to.x * 16, 16 - from.y * 16];
+      } else {
+        uv = [from.z * 16, 16 - to.y * 16, to.z * 16, 16 - from.y * 16];
+      }
+
+      return uvArrayToCorners(uv);
+    }
+
+    function uvArrayToCorners(uv) {
+      const [u1, v1, u2, v2] = uv;
+
+      return [
+        new THREE.Vector2(u1 / 16, 1 - v2 / 16),
+        new THREE.Vector2(u2 / 16, 1 - v2 / 16),
+        new THREE.Vector2(u2 / 16, 1 - v1 / 16),
+        new THREE.Vector2(u1 / 16, 1 - v1 / 16)
+      ];
+    }
+
+    function rotateUvCorners(corners, degrees) {
+      const steps = (((degrees % 360) + 360) % 360) / 90;
+      const out = corners.slice();
+
+      for (let i = 0; i < steps; i++) {
+        out.unshift(out.pop());
+      }
+
+      return out;
+    }
+
+    function applyElementRotation(vertex, rotation) {
+      const axis = rotation.axis || "y";
+      const angle = THREE.MathUtils.degToRad(Number(rotation.angle || 0));
+      const originArray = rotation.origin || [8, 8, 8];
+      const origin = vec3Div16(originArray);
+
+      const v = vertex.clone().sub(origin);
+
+      if (axis === "x") {
+        v.applyAxisAngle(new THREE.Vector3(1, 0, 0), angle);
+      } else if (axis === "y") {
+        v.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+      } else if (axis === "z") {
+        v.applyAxisAngle(new THREE.Vector3(0, 0, 1), angle);
+      }
+
+      return v.add(origin);
+    }
+
+    function applyBlockstateRotation(vertex, xDegrees, yDegrees) {
+      const center = new THREE.Vector3(0.5, 0.5, 0.5);
+      const v = vertex.clone().sub(center);
+
+      if (xDegrees) {
+        v.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(xDegrees));
+      }
+
+      if (yDegrees) {
+        v.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(-yDegrees));
+      }
+
+      return v.add(center);
+    }
+
+    function resolveTextureReference(textureValue, textureMap, modelId = "") {
+      if (textureValue === null || textureValue === undefined) {
+        return "minecraft:block/missing";
+      }
+
+      let current = textureValue;
+      const seen = new Set();
+
+      while (true) {
+        current = unwrapResourceValue(current);
+
+        if (current === null || current === undefined) {
+          return inferTextureFallback(textureValue, textureMap, modelId);
+        }
+
+        if (typeof current !== "string") {
+          console.warn("Non-string texture reference:", current, "from", textureValue);
+          return inferTextureFallback(textureValue, textureMap, modelId);
+        }
+
+        if (!current.startsWith("#")) {
+          return normalizeTextureReference(current);
+        }
+
+        const key = current.slice(1);
+
+        if (seen.has(key)) {
+          console.warn("Circular texture variable:", textureValue);
+          return inferTextureFallback(textureValue, textureMap, modelId);
+        }
+
+        seen.add(key);
+
+        if (!(key in textureMap)) {
+          console.warn("Missing texture variable:", key, "in", modelId, textureMap);
+          return inferTextureFallback(textureValue, textureMap, modelId);
+        }
+
+        current = textureMap[key];
+      }
+    }
+
+    function inferTextureFallback(textureValue, textureMap, modelId) {
+      const raw = String(textureValue || "");
+
+      const allTextureValues = Object.values(textureMap || {})
+        .map(unwrapResourceValue)
+        .filter(value => typeof value === "string");
+
+      const firstGlassTexture = allTextureValues.find(value => {
+        return value.includes("glass");
+      });
+
+      if (firstGlassTexture) {
+        if (raw === "#edge" || raw.includes("edge")) {
+          const paneTop = firstGlassTexture.replace(/_pane_top$/, "") + "_pane_top";
+          return normalizeTextureReference(paneTop);
+        }
+
+        return normalizeTextureReference(firstGlassTexture);
+      }
+
+      const modelPath = String(modelId || "");
+
+      if (modelPath.includes("glass_pane")) {
+        return "minecraft:block/glass_pane_top";
+      }
+
+      if (modelPath.includes("stained_glass_pane")) {
+        const match = modelPath.match(/block\/(.+?)_stained_glass_pane/);
+
+        if (match) {
+          return `minecraft:block/${match[1]}_stained_glass_pane_top`;
+        }
+
+        return "minecraft:block/glass_pane_top";
+      }
+
+      if (modelPath.includes("glass")) {
+        return "minecraft:block/glass";
+      }
+
+      return "minecraft:block/missing";
+    }
+
+    function unwrapResourceValue(value) {
+      if (value === null || value === undefined) return value;
+
+      if (typeof value === "string") return value;
+      if (typeof value === "number") return String(value);
+      if (typeof value === "boolean") return String(value);
+      if (typeof value === "bigint") return String(value);
+
+      if (typeof value === "object") {
+        if ("value" in value) return unwrapResourceValue(value.value);
+        if ("data" in value) return unwrapResourceValue(value.data);
+
+        const primitive = value.valueOf?.();
+        if (primitive !== value && primitive !== undefined) {
+          return unwrapResourceValue(primitive);
+        }
+      }
+
+      return value;
+    }
+
+    function normalizeTextureReference(value) {
+      if (value.includes(":")) {
+        return value;
+      }
+
+      return `${DEFAULT_NAMESPACE}:${value}`;
+    }
+
+    class GeometryBuilder {
+      constructor() {
+        this.positions = [];
+        this.uvs = [];
+        this.indices = [];
+        this.groups = [];
+        this.textureRefs = [];
+        this.textureIndex = new Map();
+      }
+
+      addFace(vertices, uvCorners, textureRef) {
+        const materialIndex = this.getTextureIndex(textureRef);
+        const startVertex = this.positions.length / 3;
+        const startIndex = this.indices.length;
+
+        for (const vertex of vertices) {
+          this.positions.push(vertex.x, vertex.y, vertex.z);
+        }
+
+        for (const uv of uvCorners) {
+          this.uvs.push(uv.x, uv.y);
+        }
+
+        this.indices.push(
+          startVertex + 0,
+          startVertex + 1,
+          startVertex + 2,
+          startVertex + 0,
+          startVertex + 2,
+          startVertex + 3
+        );
+
+        this.groups.push({
+          start: startIndex,
+          count: 6,
+          materialIndex
+        });
+      }
+
+      getTextureIndex(textureRef) {
+        if (this.textureIndex.has(textureRef)) {
+          return this.textureIndex.get(textureRef);
+        }
+
+        const index = this.textureRefs.length;
+        this.textureRefs.push(textureRef);
+        this.textureIndex.set(textureRef, index);
+
+        return index;
+      }
+
+      finish(cacheKey) {
+        return {
+          cacheKey,
+          positions: this.positions,
+          uvs: this.uvs,
+          indices: this.indices,
+          groups: this.groups,
+          textureRefs: this.textureRefs
+        };
+      }
+    }
+
+    function makeBufferGeometry(info) {
+      const geometry = new THREE.BufferGeometry();
+
+      geometry.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(info.positions, 3)
+      );
+
+      geometry.setAttribute(
+        "uv",
+        new THREE.Float32BufferAttribute(info.uvs, 2)
+      );
+
+      geometry.setIndex(info.indices);
+
+      for (const group of info.groups) {
+        geometry.addGroup(group.start, group.count, group.materialIndex);
+      }
+
+      geometry.computeVertexNormals();
+      geometry.computeBoundingSphere();
+
+      return geometry;
+    }
+
+    async function getMaterialsForTextures(textureRefs) {
+      return await Promise.all(textureRefs.map(textureRef => getMaterial(textureRef)));
+    }
+
+    async function getMaterial(textureRef) {
+      if (materialCache.has(textureRef)) {
+        return materialCache.get(textureRef);
+      }
+
+      const texture = await loadTexture(textureRef);
+      const isTransparent = isTransparentTextureRef(textureRef);
+
+      const material = new THREE.MeshLambertMaterial({
+        map: texture,
+        transparent: isTransparent,
+        alphaTest: isTransparent ? 0.08 : 0.01,
+        opacity: isGlassTextureRef(textureRef) ? 0.55 : 1,
+        side: THREE.DoubleSide,
+        depthWrite: !isGlassTextureRef(textureRef)
+      });
+
+      materialCache.set(textureRef, material);
+
+      return material;
+    }
+
+    function isTransparentTextureRef(textureRef) {
+      return (
+        isGlassTextureRef(textureRef) ||
+        textureRef.includes("pane") ||
+        textureRef.includes("bars") ||
+        textureRef.includes("torch") ||
+        textureRef.includes("fire") ||
+        textureRef.includes("cobweb") ||
+        textureRef.includes("item/barrier") ||
+        textureRef.includes("item/structure_void")
+      );
+    }
+
+    function isGlassTextureRef(textureRef) {
+      return textureRef.includes("glass");
+    }
+
+    async function loadTexture(textureRef) {
+      textureRef = unwrapResourceValue(textureRef);
+
+      if (typeof textureRef !== "string") {
+        console.warn("Invalid textureRef:", textureRef);
+        textureRef = "minecraft:block/missing";
+      }
+
+      textureRef = aliasMissingTextureRef(textureRef);
+
+      if (textureCache.has(textureRef)) {
+        return textureCache.get(textureRef);
+      }
+
+      const normalized = normalizeTextureResource(textureRef);
+      const path = resourcePath(normalized.namespace, "textures", normalized.path, "png");
+
+      const promise = new Promise(resolve => {
+        const loader = new THREE.TextureLoader();
+
+        loader.load(
+          path,
+          texture => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.magFilter = THREE.NearestFilter;
+            texture.minFilter = THREE.NearestMipmapNearestFilter;
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+
+            resolve(texture);
+          },
+          undefined,
+          () => {
+            const aliased = aliasMissingTextureRef(textureRef);
+
+            if (aliased !== textureRef) {
+              const aliasedNormalized = normalizeTextureResource(aliased);
+              const aliasedPath = resourcePath(
+                aliasedNormalized.namespace,
+                "textures",
+                aliasedNormalized.path,
+                "png"
+              );
+
+              loader.load(
+                aliasedPath,
+                texture => {
+                  texture.colorSpace = THREE.SRGBColorSpace;
+                  texture.magFilter = THREE.NearestFilter;
+                  texture.minFilter = THREE.NearestMipmapNearestFilter;
+                  texture.wrapS = THREE.ClampToEdgeWrapping;
+                  texture.wrapT = THREE.ClampToEdgeWrapping;
+
+                  console.log("Loaded aliased texture:", aliasedPath, "for", textureRef);
+
+                  resolve(texture);
+                },
+                undefined,
+                () => {
+                  console.warn("Missing texture:", path, "alias also missing:", aliasedPath);
+                  resolve(makeMissingTexture());
+                }
+              );
+
+              return;
+            }
+
+            console.warn("Missing texture:", path, "from ref:", textureRef);
+            resolve(makeMissingTexture());
+          }
+        );
+      });
+
+      textureCache.set(textureRef, promise);
+
+      return promise;
+    }
+
+    function makeMissingCubeGeometryInfo(label) {
+      const builder = new GeometryBuilder();
+
+      const model = {
+        textures: {
+          all: "minecraft:block/missing"
+        }
+      };
+
+      const element = {
+        from: [0, 0, 0],
+        to: [16, 16, 16],
+        faces: {
+          up: { texture: "#all" },
+          down: { texture: "#all" },
+          north: { texture: "#all" },
+          south: { texture: "#all" },
+          west: { texture: "#all" },
+          east: { texture: "#all" }
+        }
+      };
+
+      appendElement(builder, model, element, {
+        blockRotationX: 0,
+        blockRotationY: 0,
+        uvlock: false
+      });
+
+      return builder.finish(`missing:${label}`);
+    }
+
+    function makeMissingTexture() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#111111";
+      ctx.fillRect(0, 0, 16, 16);
+
+      ctx.fillStyle = "#ff00ff";
+      ctx.fillRect(0, 0, 8, 8);
+      ctx.fillRect(8, 8, 8, 8);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+
+      return texture;
+    }
+
+    function normalizeResourceId(value) {
+      if (!value.includes(":")) {
+        return {
+          namespace: DEFAULT_NAMESPACE,
+          path: value
+        };
+      }
+
+      const [namespace, path] = value.split(":");
+
+      return {
+        namespace,
+        path
+      };
+    }
+
+    function normalizeModelReference(value) {
+      let id = unwrapResourceValue(value);
+
+      if (typeof id !== "string") {
+        return {
+          namespace: DEFAULT_NAMESPACE,
+          path: "block/missing"
+        };
+      }
+
+      id = id.trim();
+
+      if (id.endsWith(".json")) {
+        id = id.slice(0, -5);
+      }
+
+      id = id.replace(/^\.?\//, "");
+      id = id.replace(/^data\/assets\//, "");
+      id = id.replace(/^assets\//, "");
+
+      if (id.startsWith("minecraft/models/")) {
+        return {
+          namespace: "minecraft",
+          path: id.slice("minecraft/models/".length)
+        };
+      }
+
+      if (id.startsWith("models/")) {
+        return {
+          namespace: DEFAULT_NAMESPACE,
+          path: id.slice("models/".length)
+        };
+      }
+
+      return normalizeResourceId(id);
+    }
+
+    function normalizeTextureResource(value) {
+      let id = unwrapResourceValue(value);
+
+      if (typeof id !== "string") {
+        return {
+          namespace: DEFAULT_NAMESPACE,
+          path: "block/missing"
+        };
+      }
+
+      id = id.trim();
+
+      if (id.endsWith(".png")) {
+        id = id.slice(0, -4);
+      }
+
+      id = id.replace(/^\.?\//, "");
+      id = id.replace(/^data\/assets\//, "");
+      id = id.replace(/^assets\//, "");
+
+      if (id.startsWith("minecraft/textures/")) {
+        return {
+          namespace: "minecraft",
+          path: id.slice("minecraft/textures/".length)
+        };
+      }
+
+      if (id.startsWith("textures/")) {
+        return {
+          namespace: DEFAULT_NAMESPACE,
+          path: id.slice("textures/".length)
+        };
+      }
+
+      return normalizeResourceId(id);
+    }
+
+    function resourcePath(namespace, folder, path, extension) {
+      path = String(path).replace(/^\/+/, "");
+
+      return `${RESOURCE_ROOT}${namespace}/${folder}/${path}.${extension}`;
+    }
+
+    function vec3Div16(array) {
+      return new THREE.Vector3(
+        Number(array[0]) / 16,
+        Number(array[1]) / 16,
+        Number(array[2]) / 16
+      );
+    }
+
+    function updatePick(event) {
+      if (pickables.length === 0) return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      const hits = raycaster.intersectObjects(pickables, false);
+
+      if (hits.length === 0) {
+        return;
+      }
+
+      const hit = hits[0];
+      const block = hit.object.userData.blocks[hit.instanceId];
+
+      if (!block) return;
+
+      const [x, y, z] = block.pos;
+
+      selectedText.textContent = `${x}, ${y}, ${z}`;
+      blockTypeText.textContent = block.name;
+      hint.textContent = `Relative coordinate: ${x}, ${y}, ${z} | ${block.name}`;
+    }
+
+    renderer.domElement.addEventListener("pointermove", updatePick);
+    renderer.domElement.addEventListener("click", updatePick);
+
+    function resize() {
+      const rect = viewer.getBoundingClientRect();
+
+      camera.aspect = rect.width / rect.height;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(rect.width, rect.height);
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
