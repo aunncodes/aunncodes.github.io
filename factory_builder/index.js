@@ -1,7 +1,7 @@
 function find_recipe(end_item)
 {
     // find end_item in recipes
-    for(var type of ["cutter", "furnace", "crafter_2", "crafter_3", "washer", "crusher", "flashbaker", "enchanter", "sonic_zapper", "processor"])
+    for(var type of ["cutter", "furnace", "crafter_2", "crafter_3", "washer", "crusher", "flashbaker", "enchanter", "sonic_zapper", "crafter_5"])
     {
         for(var recipe of RECIPES[type])
         {
