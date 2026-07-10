@@ -31,7 +31,7 @@ const recipe_type_to_block = {
     "crusher": "fb_crusher",
     "enchanter": "fb_enchanter",
     "explosive_furnace": "fb_explosive_furnace",
-    "crafter_5": "fb_crafter_5"
+    "processor": "fb_processor"
 }
 var recipe_lines = [];
 
@@ -202,7 +202,7 @@ function render_recipe(end_item)
             });
             break;
         }
-        case "crafter_5":
+        case "processor":
         {
             div = document.createElement("div");
             div.classList = "recipe crafter crafter_5";
